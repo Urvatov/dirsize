@@ -1,0 +1,15 @@
+{
+	"name": "dirsize",
+	"version": "0.1.0",
+	"description": "CLI tool for finding the largest directories",
+	"type": "module",
+	"bin": {
+		"dirsize": "./source/main.ts"
+	},
+	"scripts": {
+		"start": "bun run source/main.ts"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	}
+}
