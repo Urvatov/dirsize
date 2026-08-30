@@ -1,47 +1,74 @@
-import * as fs from "node:fs/promises";
+import fs from "node:fs/promises";
 import path from "node:path";
 
-async function scanDirectory(directoryPath: string) {
-	const result: Record<string, number> = {};
+export interface FolderInfo {
+	name: string;
+	size: number;
+}
 
+async function scanDirectory(directoryPath: string): Promise<FolderInfo[]> {
 	const entries = await fs.readdir(directoryPath, {
 		withFileTypes: true,
 	});
 
-	for (const entry of entries) {
-		if (!entry.isDirectory()) {
-			continue;
-		}
+	const folders = entries.filter((entry) => entry.isDirectory());
 
-		const folderPath = path.join(directoryPath, entry.name);
-		const size = await getFolderSize(folderPath);
+	return Promise.all(
+		folders.map(async (entry) => {
+			const folderPath = path.join(directoryPath, entry.name);
 
-		result[entry.name] = size;
-	}
-
-	return result;
+			return {
+				name: entry.name,
+				size: await getFolderSize(folderPath),
+			};
+		}),
+	);
 }
 
-async function getFolderSize(folderPath: string) {
-	const entries = await fs.readdir(folderPath, {
-		recursive: true,
-		withFileTypes: true,
-	});
+async function getFolderSize(folderPath: string): Promise<number> {
+	let entries;
 
-	let size = 0;
+	try {
+		entries = await fs.readdir(folderPath, {
+			recursive: true,
+			withFileTypes: true,
+		});
+	} catch (error) {
+		logScanError(folderPath, error);
 
-	for (const entry of entries) {
-		if (!entry.isFile()) {
-			continue;
-		}
-
-		const fullPath = path.join(entry.parentPath, entry.name);
-		const stat = await fs.stat(fullPath);
-
-		size += stat.size;
+		return 0;
 	}
 
-	return size;
+	const files = entries.filter((entry) => entry.isFile());
+
+	const results = await Promise.all(
+		files.map(async (entry) => {
+			const fullPath = path.join(entry.parentPath, entry.name);
+
+			try {
+				const stat = await fs.stat(fullPath);
+
+				return stat.size;
+			} catch (error) {
+				logScanError(fullPath, error);
+
+				return 0;
+			}
+		}),
+	);
+
+	return results.reduce((total, size) => total + size, 0);
+}
+
+function logScanError(targetPath: string, error: unknown): void {
+	let message: string;
+
+	if (error instanceof Error) {
+		message = error.message;
+	} else {
+		message = String(error);
+	}
+	console.warn(`Warning: cannot access "${targetPath}": ${message}`);
 }
 
 export default {

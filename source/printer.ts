@@ -1,3 +1,6 @@
+import Table from "cli-table3";
+import type { FolderInfo } from "./scanner";
+
 function formatSize(bytes: number): string {
 	const units = ["B", "KB", "MB", "GB", "TB"];
 
@@ -9,45 +12,33 @@ function formatSize(bytes: number): string {
 		unit++;
 	}
 
-	return `${size.toFixed(2)} ${units[unit]}`;
+	let formattedSize: string;
+
+	if (size % 1 === 0) {
+		formattedSize = String(size);
+	} else {
+		formattedSize = size.toFixed(2);
+	}
+
+	return `${formattedSize} ${units[unit]}`;
 }
 
-function printFolders(folders: Record<string, number>) {
-	const entries = Object.entries(folders).sort(
-		([, sizeA], [, sizeB]) => sizeB - sizeA,
-	);
+function printFolders(folders: FolderInfo[]): void {
+	const entries = [...folders].sort((a, b) => b.size - a.size);
+	const total = entries.reduce((sum, { size }) => sum + size, 0);
 
-	const nameWidth = Math.max(
-		"Folder".length,
-		...entries.map(([name]) => name.length),
-	);
+	console.log(`Total: ${formatSize(total)}`);
 
-	const sizeWidth = Math.max(
-		"Size".length,
-		...entries.map(([, size]) => formatSize(size).length),
-	);
-
-	const numberWidth = String(entries.length).length;
-
-	const separator = `+-${"-".repeat(numberWidth)}-+-${"-".repeat(nameWidth)}-+-${"-".repeat(sizeWidth)}-+`;
-
-	console.log(separator);
-	console.log(
-		`| ${"#".padStart(numberWidth)} | ` +
-			`${"Folder".padEnd(nameWidth)} | ` +
-			`${"Size".padStart(sizeWidth)} |`,
-	);
-	console.log(separator);
-
-	entries.forEach(([name, size], index) => {
-		console.log(
-			`| ${String(index + 1).padStart(numberWidth)} | ` +
-				`${name.padEnd(nameWidth)} | ` +
-				`${formatSize(size).padStart(sizeWidth)} |`,
-		);
+	const table = new Table({
+		head: ["#", "Folder", "Size"],
+		style: { head: ["bold"] },
 	});
 
-	console.log(separator);
+	entries.forEach(({ name, size }, index) => {
+		table.push([index + 1, name, formatSize(size)]);
+	});
+
+	console.log(table.toString());
 }
 
 export default {
