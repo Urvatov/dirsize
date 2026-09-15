@@ -1,16 +1,30 @@
 {
 	"name": "dirsize",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "CLI tool for finding the largest directories",
 	"type": "module",
 	"bin": {
-		"dirsize": "./source/main.ts"
+		"dirsize": "./dist/index.js"
 	},
+	"files": [
+		"dist"
+	],
 	"scripts": {
-		"start": "bun run source/main.ts"
+		"start": "bun run source/main.ts",
+		"start:node": "node dist/index.js",
+		"build": "bun build ./source/main.ts --outfile=dist/index.js --target=node",
+		"build:tsc": "tsc",
+		"build:bin": "bun build --compile --minify ./source/main.ts --outfile=dirsize",
+		"lint": "eslint .",
+		"prepack": "bun run build"
 	},
 	"devDependencies": {
-		"@types/bun": "latest"
+		"@eslint/js": "^10.0.1",
+		"@types/bun": "latest",
+		"@types/node": "^26.5.1",
+		"eslint": "^10.10.0",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.70.0"
 	},
 	"dependencies": {
 		"cli-table3": "^0.6.5"

@@ -6,58 +6,103 @@ export interface FolderInfo {
 	size: number;
 }
 
-async function scanDirectory(directoryPath: string): Promise<FolderInfo[]> {
+export interface ScanOptions {
+	includeFiles?: boolean;
+}
+
+export async function scanDirectory(
+	directoryPath: string,
+	options: ScanOptions = {},
+): Promise<FolderInfo[]> {
 	const entries = await fs.readdir(directoryPath, {
 		withFileTypes: true,
 	});
 
-	const folders = entries.filter((entry) => entry.isDirectory());
+	const folderEntries = entries.filter((entry) => entry.isDirectory());
+	const fileEntries = entries.filter((entry) => entry.isFile());
 
-	return Promise.all(
-		folders.map(async (entry) => {
+	const folderResults = await Promise.all(
+		folderEntries.map(async (entry) => {
 			const folderPath = path.join(directoryPath, entry.name);
-
 			return {
 				name: entry.name,
 				size: await getFolderSize(folderPath),
 			};
 		}),
 	);
-}
 
-async function getFolderSize(folderPath: string): Promise<number> {
-	let entries;
-
-	try {
-		entries = await fs.readdir(folderPath, {
-			recursive: true,
-			withFileTypes: true,
-		});
-	} catch (error) {
-		logScanError(folderPath, error);
-
-		return 0;
-	}
-
-	const files = entries.filter((entry) => entry.isFile());
-
-	const results = await Promise.all(
-		files.map(async (entry) => {
-			const fullPath = path.join(entry.parentPath, entry.name);
-
+	if (options.includeFiles && fileEntries.length > 0) {
+		const statPromises = fileEntries.map(async (entry) => {
+			const filePath = path.join(directoryPath, entry.name);
 			try {
-				const stat = await fs.stat(fullPath);
-
+				const stat = await fs.lstat(filePath);
 				return stat.size;
 			} catch (error) {
-				logScanError(fullPath, error);
-
+				logScanError(filePath, error);
 				return 0;
 			}
-		}),
-	);
+		});
 
-	return results.reduce((total, size) => total + size, 0);
+		const fileSizes = await Promise.all(statPromises);
+		const totalFilesSize = fileSizes.reduce((sum, size) => sum + size, 0);
+
+		if (totalFilesSize > 0) {
+			folderResults.push({
+				name: "(files in root)",
+				size: totalFilesSize,
+			});
+		}
+	}
+
+	return folderResults;
+}
+
+export async function getFolderSize(folderPath: string): Promise<number> {
+	let totalSize = 0;
+	const stack: string[] = [folderPath];
+
+	while (stack.length > 0) {
+		const currentPath = stack.pop();
+		if (!currentPath) {
+			continue;
+		}
+
+		let entries;
+		try {
+			entries = await fs.readdir(currentPath, { withFileTypes: true });
+		} catch (error) {
+			logScanError(currentPath, error);
+			continue;
+		}
+
+		const statPromises: Promise<number>[] = [];
+
+		for (const entry of entries) {
+			const fullPath = path.join(currentPath, entry.name);
+
+			if (entry.isDirectory()) {
+				stack.push(fullPath);
+			} else if (entry.isFile()) {
+				statPromises.push(
+					fs.lstat(fullPath)
+						.then((stat) => stat.size)
+						.catch((error) => {
+							logScanError(fullPath, error);
+							return 0;
+						}),
+				);
+			}
+		}
+
+		if (statPromises.length > 0) {
+			const sizes = await Promise.all(statPromises);
+			for (const size of sizes) {
+				totalSize += size;
+			}
+		}
+	}
+
+	return totalSize;
 }
 
 function logScanError(targetPath: string, error: unknown): void {
@@ -73,4 +118,5 @@ function logScanError(targetPath: string, error: unknown): void {
 
 export default {
 	scanDirectory,
+	getFolderSize,
 };
