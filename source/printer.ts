@@ -1,5 +1,9 @@
 import Table from "cli-table3";
-import type { FolderInfo } from "./scanner";
+import { EntryType, type FolderInfo } from "./scanner";
+
+const FILE_EMOJI: string = "📄";
+const FOLDER_EMOJI: string = "📁";
+const UNKNOWN_EMOJI: string = "❓";
 
 export enum SizeUnit {
 	Byte = "B",
@@ -36,7 +40,6 @@ export function formatSize(bytes: number): string {
 		unitIndex++;
 	}
 
-	// Handle rounding up edge case (e.g. 1023.996 rounding to 1024.00)
 	if (size >= 1023.995 && unitIndex < UNIT_ORDER.length - 1) {
 		size = 1;
 		unitIndex++;
@@ -64,19 +67,33 @@ export function printFolders(folders: FolderInfo[], options: PrintFoldersOptions
 	const remaining = entries.slice(limit);
 
 	const table = new Table({
-		head: ["#", "Folder", "Size", "%"],
+		head: ["#", "Type", "Entry", "Size", "%"],
 		style: { head: ["bold"] },
 	});
 
-	visible.forEach(({ name, size }, index) => {
+	visible.forEach(({ name, size, entryType }, index) => {
 		const percent = total > 0 ? ((size / total) * 100).toFixed(1) + "%" : "0.0%";
-		table.push([index + 1, name, formatSize(size), percent]);
+		let prefixEmoji: string;
+
+		switch (entryType) {
+			case EntryType.Folder:
+				prefixEmoji = FOLDER_EMOJI;
+				break;
+			case EntryType.File:
+				prefixEmoji = FILE_EMOJI;
+				break;
+			default:
+				prefixEmoji = UNKNOWN_EMOJI;
+				break;
+		}
+
+		table.push([index + 1, prefixEmoji, name, formatSize(size), percent]);
 	});
 
 	if (remaining.length > 0) {
 		const remainingSize = remaining.reduce((sum, { size }) => sum + size, 0);
 		const remainingPercent = total > 0 ? ((remainingSize / total) * 100).toFixed(1) + "%" : "0.0%";
-		table.push(["-", `(${remaining.length} other folders)`, formatSize(remainingSize), remainingPercent]);
+		table.push(["-", UNKNOWN_EMOJI, `(${remaining.length} other entries)`, formatSize(remainingSize), remainingPercent]);
 	}
 
 	console.log(table.toString());

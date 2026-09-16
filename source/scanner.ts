@@ -1,19 +1,22 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+export enum EntryType {
+	Folder = "FOLDER",
+	File = "FILE",
+}
+
 export interface FolderInfo {
 	name: string;
 	size: number;
+	entryType: EntryType;
 }
 
 export interface ScanOptions {
 	includeFiles?: boolean;
 }
 
-export async function scanDirectory(
-	directoryPath: string,
-	options: ScanOptions = {},
-): Promise<FolderInfo[]> {
+export async function scanDirectory(directoryPath: string, options: ScanOptions = {}): Promise<FolderInfo[]> {
 	const entries = await fs.readdir(directoryPath, {
 		withFileTypes: true,
 	});
@@ -27,31 +30,34 @@ export async function scanDirectory(
 			return {
 				name: entry.name,
 				size: await getFolderSize(folderPath),
+				entryType: EntryType.Folder,
 			};
 		}),
 	);
 
 	if (options.includeFiles && fileEntries.length > 0) {
-		const statPromises = fileEntries.map(async (entry) => {
-			const filePath = path.join(directoryPath, entry.name);
-			try {
-				const stat = await fs.lstat(filePath);
-				return stat.size;
-			} catch (error) {
-				logScanError(filePath, error);
-				return 0;
-			}
-		});
+		const fileInfos = await Promise.all(
+			fileEntries.map(async (entry) => {
+				const filePath = path.join(directoryPath, entry.name);
+				try {
+					const stat = await fs.lstat(filePath);
+					return {
+						name: entry.name,
+						size: stat.size,
+						entryType: EntryType.File,
+					};
+				} catch (error) {
+					logScanError(filePath, error);
+					return {
+						name: entry.name,
+						size: 0,
+						entryType: EntryType.File,
+					};
+				}
+			}),
+		);
 
-		const fileSizes = await Promise.all(statPromises);
-		const totalFilesSize = fileSizes.reduce((sum, size) => sum + size, 0);
-
-		if (totalFilesSize > 0) {
-			folderResults.push({
-				name: "(files in root)",
-				size: totalFilesSize,
-			});
-		}
+		folderResults.push(...fileInfos);
 	}
 
 	return folderResults;
@@ -84,7 +90,8 @@ export async function getFolderSize(folderPath: string): Promise<number> {
 				stack.push(fullPath);
 			} else if (entry.isFile()) {
 				statPromises.push(
-					fs.lstat(fullPath)
+					fs
+						.lstat(fullPath)
 						.then((stat) => stat.size)
 						.catch((error) => {
 							logScanError(fullPath, error);
@@ -119,4 +126,5 @@ function logScanError(targetPath: string, error: unknown): void {
 export default {
 	scanDirectory,
 	getFolderSize,
+	EntryType,
 };
