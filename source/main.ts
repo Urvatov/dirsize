@@ -2,34 +2,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import yoctoSpinner from "yocto-spinner";
 
+import pkg from "../package.json" with { type: "json" };
 import { scanDirectory } from "./scanner";
 import { printFolders } from "./printer";
+import { printHelp } from "./help";
 
-const VERSION = "0.2.0";
-
-function printHelp(): void {
-	console.log(`dirsize v${VERSION}
-CLI tool for finding the largest directories
-
-Usage:
-  dirsize [directory] [options]
-
-Arguments:
-  [directory]         Directory to scan (default: current directory ".")
-
-Options:
-  -n, --limit <n>     Limit output to top N directories
-  -a, --all           Include direct files in the target directory
-  -h, --help          Show this help message
-  -v, --version       Show version number
-
-Examples:
-  dirsize
-  dirsize ./src
-  dirsize . -n 10
-  dirsize . --all`);
-}
+const VERSION = pkg.version;
 
 async function run(): Promise<void> {
 	let args;
@@ -40,7 +20,11 @@ async function run(): Promise<void> {
 				help: { type: "boolean", short: "h", default: false },
 				version: { type: "boolean", short: "v", default: false },
 				limit: { type: "string", short: "n" },
+				depth: { type: "string", short: "d" },
 				all: { type: "boolean", short: "a", default: false },
+				"no-emoji": { type: "boolean", default: false },
+				noemoji: { type: "boolean", default: false },
+				verbose: { type: "boolean", default: false },
 			},
 			allowPositionals: true,
 			strict: false,
@@ -56,7 +40,7 @@ async function run(): Promise<void> {
 	const { values, positionals } = args;
 
 	if (values.help) {
-		printHelp();
+		printHelp(VERSION);
 		return;
 	}
 
@@ -76,6 +60,20 @@ async function run(): Promise<void> {
 		limit = parsedLimit;
 	}
 
+	let depth = 1;
+	if (typeof values.depth === "string") {
+		const parsedDepth = Number.parseInt(values.depth, 10);
+		if (Number.isNaN(parsedDepth) || parsedDepth <= 0) {
+			console.error(`Error: Invalid depth value "${values.depth}". Must be a positive integer.`);
+			process.exitCode = 1;
+			return;
+		}
+		depth = parsedDepth;
+	}
+
+	const noEmoji = Boolean(values["no-emoji"] || values.noemoji);
+	const verbose = Boolean(values.verbose);
+
 	const rawPath = positionals[0] ?? ".";
 	const directoryPath = path.resolve(rawPath);
 
@@ -93,12 +91,22 @@ async function run(): Promise<void> {
 		return;
 	}
 
+	const spinner = yoctoSpinner({ text: "Scanning..." });
+	spinner.start();
+
 	try {
-		const folders = await scanDirectory(directoryPath, {
+		const { entries, totalSize } = await scanDirectory(directoryPath, {
 			includeFiles: Boolean(values.all),
+			depth,
+			verbose,
+			onProgress: (scannedFiles) => {
+				spinner.text = `Scanning... (${scannedFiles} files)`;
+			},
 		});
-		printFolders(folders, { limit });
+		spinner.stop();
+		printFolders(entries, { limit, totalSize, noEmoji });
 	} catch (error) {
+		spinner.stop();
 		const message = error instanceof Error ? error.message : String(error);
 		console.error(`Failed to scan "${directoryPath}": ${message}`);
 		process.exitCode = 1;

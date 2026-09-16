@@ -14,107 +14,141 @@ export interface FolderInfo {
 
 export interface ScanOptions {
 	includeFiles?: boolean;
+	depth?: number;
+	verbose?: boolean;
+	onProgress?: (scannedFiles: number) => void;
 }
 
-export async function scanDirectory(directoryPath: string, options: ScanOptions = {}): Promise<FolderInfo[]> {
-	const entries = await fs.readdir(directoryPath, {
-		withFileTypes: true,
-	});
+export interface ScanResult {
+	entries: FolderInfo[];
+	totalSize: number;
+}
 
-	const folderEntries = entries.filter((entry) => entry.isDirectory());
-	const fileEntries = entries.filter((entry) => entry.isFile());
+export async function scanDirectory(directoryPath: string, options: ScanOptions = {}): Promise<ScanResult> {
+	const maxDepth = options.depth && options.depth > 0 ? options.depth : 1;
+	const folderSizes = new Map<string, number>();
+	const discoveredFolders: Array<{ relPath: string; depth: number }> = [];
+	const discoveredFiles: Array<{ relPath: string; size: number; depth: number }> = [];
 
-	const folderResults = await Promise.all(
-		folderEntries.map(async (entry) => {
-			const folderPath = path.join(directoryPath, entry.name);
-			return {
-				name: entry.name,
-				size: await getFolderSize(folderPath),
-				entryType: EntryType.Folder,
-			};
-		}),
-	);
+	let scannedFilesCount = 0;
 
-	if (options.includeFiles && fileEntries.length > 0) {
-		const fileInfos = await Promise.all(
-			fileEntries.map(async (entry) => {
-				const filePath = path.join(directoryPath, entry.name);
-				try {
-					const stat = await fs.lstat(filePath);
-					return {
-						name: entry.name,
-						size: stat.size,
-						entryType: EntryType.File,
-					};
-				} catch (error) {
-					logScanError(filePath, error);
-					return {
-						name: entry.name,
-						size: 0,
-						entryType: EntryType.File,
-					};
-				}
-			}),
-		);
-
-		folderResults.push(...fileInfos);
+	interface QueueItem {
+		fullPath: string;
+		relPath: string;
+		depth: number;
 	}
 
-	return folderResults;
-}
-
-export async function getFolderSize(folderPath: string): Promise<number> {
-	let totalSize = 0;
-	const stack: string[] = [folderPath];
+	const stack: QueueItem[] = [{ fullPath: directoryPath, relPath: "", depth: 0 }];
 
 	while (stack.length > 0) {
-		const currentPath = stack.pop();
-		if (!currentPath) {
+		const current = stack.pop();
+		if (!current) {
 			continue;
 		}
 
-		let entries;
+		let dirEntries;
 		try {
-			entries = await fs.readdir(currentPath, { withFileTypes: true });
+			dirEntries = await fs.readdir(current.fullPath, { withFileTypes: true });
 		} catch (error) {
-			logScanError(currentPath, error);
+			logScanError(current.fullPath, error, options.verbose);
 			continue;
 		}
 
-		const statPromises: Promise<number>[] = [];
+		const statPromises: Promise<{ relPath: string; size: number; depth: number }>[] = [];
 
-		for (const entry of entries) {
-			const fullPath = path.join(currentPath, entry.name);
+		for (const entry of dirEntries) {
+			const entryRelPath = current.relPath ? `${current.relPath}/${entry.name}` : entry.name;
+			const entryFullPath = path.join(current.fullPath, entry.name);
+			const entryDepth = current.depth + 1;
 
 			if (entry.isDirectory()) {
-				stack.push(fullPath);
+				if (entryDepth <= maxDepth) {
+					discoveredFolders.push({ relPath: entryRelPath, depth: entryDepth });
+				}
+				stack.push({
+					fullPath: entryFullPath,
+					relPath: entryRelPath,
+					depth: entryDepth,
+				});
 			} else if (entry.isFile()) {
 				statPromises.push(
 					fs
-						.lstat(fullPath)
-						.then((stat) => stat.size)
+						.lstat(entryFullPath)
+						.then((stat) => ({
+							relPath: entryRelPath,
+							size: stat.size,
+							depth: entryDepth,
+						}))
 						.catch((error) => {
-							logScanError(fullPath, error);
-							return 0;
+							logScanError(entryFullPath, error, options.verbose);
+							return {
+								relPath: entryRelPath,
+								size: 0,
+								depth: entryDepth,
+							};
 						}),
 				);
 			}
 		}
 
 		if (statPromises.length > 0) {
-			const sizes = await Promise.all(statPromises);
-			for (const size of sizes) {
-				totalSize += size;
+			const fileResults = await Promise.all(statPromises);
+			scannedFilesCount += fileResults.length;
+			if (options.onProgress) {
+				options.onProgress(scannedFilesCount);
+			}
+
+			for (const file of fileResults) {
+				if (options.includeFiles && file.depth <= maxDepth) {
+					discoveredFiles.push(file);
+				}
+
+				const lastSlash = file.relPath.lastIndexOf("/");
+				let folderPath = lastSlash === -1 ? "" : file.relPath.slice(0, lastSlash);
+
+				while (true) {
+					folderSizes.set(folderPath, (folderSizes.get(folderPath) ?? 0) + file.size);
+					if (!folderPath) {
+						break;
+					}
+					const prevSlash = folderPath.lastIndexOf("/");
+					folderPath = prevSlash === -1 ? "" : folderPath.slice(0, prevSlash);
+				}
 			}
 		}
 	}
 
-	return totalSize;
+	const totalSize = folderSizes.get("") ?? 0;
+
+	const entries: FolderInfo[] = discoveredFolders.map((folder) => ({
+		name: folder.relPath,
+		size: folderSizes.get(folder.relPath) ?? 0,
+		entryType: EntryType.Folder,
+	}));
+
+	if (options.includeFiles) {
+		const fileEntries: FolderInfo[] = discoveredFiles.map((file) => ({
+			name: file.relPath,
+			size: file.size,
+			entryType: EntryType.File,
+		}));
+		entries.push(...fileEntries);
+	}
+
+	return { entries, totalSize };
 }
 
-function logScanError(targetPath: string, error: unknown): void {
-	let message: string;
+export async function getFolderSize(folderPath: string, options: { verbose?: boolean } = {}): Promise<number> {
+	const result = await scanDirectory(folderPath, { depth: 1, verbose: options.verbose });
+	return result.totalSize;
+}
 
+function logScanError(targetPath: string, error: unknown, verbose?: boolean): void {
+	if (!verbose) {
+		return;
+	}
+
+	let message: string;
 	if (error instanceof Error) {
 		message = error.message;
 	} else {

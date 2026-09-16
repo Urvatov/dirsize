@@ -5,6 +5,10 @@ const FILE_EMOJI: string = "📄";
 const FOLDER_EMOJI: string = "📁";
 const UNKNOWN_EMOJI: string = "❓";
 
+const FILE_TEXT: string = "FILE";
+const FOLDER_TEXT: string = "FOLDER";
+const UNKNOWN_TEXT: string = "OTHER";
+
 export enum SizeUnit {
 	Byte = "B",
 	Kilobyte = "KB",
@@ -25,6 +29,8 @@ export const UNIT_ORDER: readonly SizeUnit[] = [
 
 export interface PrintFoldersOptions {
 	limit?: number;
+	totalSize?: number;
+	noEmoji?: boolean;
 }
 
 export function formatSize(bytes: number): string {
@@ -53,7 +59,7 @@ export function formatSize(bytes: number): string {
 
 export function printFolders(folders: FolderInfo[], options: PrintFoldersOptions = {}): void {
 	const entries = [...folders].sort((a, b) => b.size - a.size);
-	const total = entries.reduce((sum, { size }) => sum + size, 0);
+	const total = options.totalSize !== undefined ? options.totalSize : entries.reduce((sum, { size }) => sum + size, 0);
 
 	console.log(`Total: ${formatSize(total)}`);
 
@@ -73,27 +79,42 @@ export function printFolders(folders: FolderInfo[], options: PrintFoldersOptions
 
 	visible.forEach(({ name, size, entryType }, index) => {
 		const percent = total > 0 ? ((size / total) * 100).toFixed(1) + "%" : "0.0%";
-		let prefixEmoji: string;
+		let typeLabel: string;
 
-		switch (entryType) {
-			case EntryType.Folder:
-				prefixEmoji = FOLDER_EMOJI;
-				break;
-			case EntryType.File:
-				prefixEmoji = FILE_EMOJI;
-				break;
-			default:
-				prefixEmoji = UNKNOWN_EMOJI;
-				break;
+		if (options.noEmoji) {
+			switch (entryType) {
+				case EntryType.Folder:
+					typeLabel = FOLDER_TEXT;
+					break;
+				case EntryType.File:
+					typeLabel = FILE_TEXT;
+					break;
+				default:
+					typeLabel = UNKNOWN_TEXT;
+					break;
+			}
+		} else {
+			switch (entryType) {
+				case EntryType.Folder:
+					typeLabel = FOLDER_EMOJI;
+					break;
+				case EntryType.File:
+					typeLabel = FILE_EMOJI;
+					break;
+				default:
+					typeLabel = UNKNOWN_EMOJI;
+					break;
+			}
 		}
 
-		table.push([index + 1, prefixEmoji, name, formatSize(size), percent]);
+		table.push([index + 1, typeLabel, name, formatSize(size), percent]);
 	});
 
 	if (remaining.length > 0) {
 		const remainingSize = remaining.reduce((sum, { size }) => sum + size, 0);
 		const remainingPercent = total > 0 ? ((remainingSize / total) * 100).toFixed(1) + "%" : "0.0%";
-		table.push(["-", UNKNOWN_EMOJI, `(${remaining.length} other entries)`, formatSize(remainingSize), remainingPercent]);
+		const remainingType = options.noEmoji ? UNKNOWN_TEXT : UNKNOWN_EMOJI;
+		table.push(["-", remainingType, `(${remaining.length} other entries)`, formatSize(remainingSize), remainingPercent]);
 	}
 
 	console.log(table.toString());

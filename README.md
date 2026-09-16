@@ -46,8 +46,11 @@ If no directory is specified, `dirsize` scans the current directory (`.`) by def
 
 | Option | Alias | Description |
 |---|---|---|
+| `--depth <n>` | `-d` | Depth of directory traversal (default: 1) |
 | `--limit <n>` | `-n` | Limit output to top N directories (remaining folders grouped together) |
 | `--all` | `-a` | Include direct files in the target directory |
+| `--no-emoji` | | Display plain text types (FOLDER, FILE) instead of emojis |
+| `--verbose` | | Show warnings for inaccessible files and directories |
 | `--help` | `-h` | Show usage instructions |
 | `--version` | `-v` | Show version |
 
@@ -55,34 +58,34 @@ If no directory is specified, `dirsize` scans the current directory (`.`) by def
 
 ```
 $ dirsize .
-Total: 43.90 MB
-┌───┬──────────────┬──────────┬───────┐
-│ # │ Folder       │ Size     │ %     │
-├───┼──────────────┼──────────┼───────┤
-│ 1 │ node_modules │ 43.82 MB │ 99.8% │
-├───┼──────────────┼──────────┼───────┤
-│ 2 │ .git         │ 60.01 KB │ 0.1%  │
-├───┼──────────────┼──────────┼───────┤
-│ 3 │ build        │ 16.41 KB │ 0.0%  │
-├───┼──────────────┼──────────┼───────┤
-│ 4 │ source       │ 7.45 KB  │ 0.0%  │
-└───┴──────────────┴──────────┴───────┘
+Total: 46.49 MB
+┌───┬──────┬──────────────┬───────────┬───────┐
+│ # │ Type │ Entry        │ Size      │ %     │
+├───┼──────┼──────────────┼───────────┼───────┤
+│ 1 │ 📁   │ node_modules │ 46.20 MB  │ 99.4% │
+├───┼──────┼──────────────┼───────────┼───────┤
+│ 2 │ 📁   │ .git         │ 101.38 KB │ 0.2%  │
+├───┼──────┼──────────────┼───────────┼───────┤
+│ 3 │ 📁   │ dist         │ 85.55 KB  │ 0.2%  │
+├───┼──────┼──────────────┼───────────┼───────┤
+│ 4 │ 📁   │ source       │ 11.01 KB  │ 0.0%  │
+└───┴──────┴──────────────┴───────────┴───────┘
 ```
 
 With `--limit`:
 
 ```
 $ dirsize . -n 2
-Total: 43.90 MB
-┌───┬───────────────────┬──────────┬───────┐
-│ # │ Folder            │ Size     │ %     │
-├───┼───────────────────┼──────────┼───────┤
-│ 1 │ node_modules      │ 43.82 MB │ 99.8% │
-├───┼───────────────────┼──────────┼───────┤
-│ 2 │ .git              │ 60.01 KB │ 0.1%  │
-├───┼───────────────────┼──────────┼───────┤
-│ - │ (2 other folders) │ 23.86 KB │ 0.1%  │
-└───┴───────────────────┴──────────┴───────┘
+Total: 46.49 MB
+┌───┬──────┬───────────────────┬───────────┬───────┐
+│ # │ Type │ Entry             │ Size      │ %     │
+├───┼──────┼───────────────────┼───────────┼───────┤
+│ 1 │ 📁   │ node_modules      │ 46.20 MB  │ 99.4% │
+├───┼──────┼───────────────────┼───────────┼───────┤
+│ 2 │ 📁   │ .git              │ 101.38 KB │ 0.2%  │
+├───┼──────┼───────────────────┼───────────┼───────┤
+│ - │ ❓   │ (2 other entries) │ 96.56 KB  │ 0.2%  │
+└───┴──────┴───────────────────┴───────────┴───────┘
 ```
 
 ## Development
