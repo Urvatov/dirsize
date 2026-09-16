@@ -11,13 +11,13 @@ A fast, lightweight CLI tool for finding the largest directories.
 Install globally via the release package:
 
 ```bash
-npm install -g https://github.com/Urvatov/dirsize/releases/latest/download/dirsize-0.2.1.tgz
+npm install -g https://github.com/Urvatov/dirsize/releases/latest/download/dirsize-0.3.0.tgz
 ```
 
 #### With Bun
 
 ```bash
-bun add -g https://github.com/Urvatov/dirsize/releases/latest/download/dirsize-0.2.1.tgz
+bun add -g https://github.com/Urvatov/dirsize/releases/latest/download/dirsize-0.3.0.tgz
 ```
 
 #### Standalone Executable (No Bun or Node required)
