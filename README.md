@@ -24,9 +24,9 @@ bun add -g https://github.com/Urvatov/dirsize/releases/latest/download/dirsize-0
 
 Download the single executable binary for your OS directly from [GitHub Releases](https://github.com/Urvatov/dirsize/releases/latest):
 
-* **Windows**: `dirsize-windows-x64.exe`
-* **Linux**: `dirsize-linux-x64`
-* **macOS (Apple Silicon)**: `dirsize-darwin-arm64`
+- **Windows**: `dirsize-windows-x64.exe`
+- **Linux**: `dirsize-linux-x64`
+- **macOS (Apple Silicon)**: `dirsize-darwin-arm64`
 
 Example for Linux / macOS:
 
@@ -44,15 +44,15 @@ If no directory is specified, `dirsize` scans the current directory (`.`) by def
 
 ### Options
 
-| Option | Alias | Description |
-|---|---|---|
-| `--depth <n>` | `-d` | Depth of directory traversal (default: 1) |
-| `--limit <n>` | `-n` | Limit output to top N directories (remaining folders grouped together) |
-| `--all` | `-a` | Include direct files in the target directory |
-| `--no-emoji` | | Display plain text types (FOLDER, FILE) instead of emojis |
-| `--verbose` | | Show warnings for inaccessible files and directories |
-| `--help` | `-h` | Show usage instructions |
-| `--version` | `-v` | Show version |
+| Option        | Alias | Description                                                            |
+| ------------- | ----- | ---------------------------------------------------------------------- |
+| `--depth <n>` | `-d`  | Depth of directory traversal (default: 1)                              |
+| `--limit <n>` | `-n`  | Limit output to top N directories (remaining folders grouped together) |
+| `--all`       | `-a`  | Include direct files in the target directory                           |
+| `--no-emoji`  |       | Display plain text types (FOLDER, FILE) instead of emojis              |
+| `--verbose`   |       | Show warnings for inaccessible files and directories                   |
+| `--help`      | `-h`  | Show usage instructions                                                |
+| `--version`   | `-v`  | Show version                                                           |
 
 ## Example
 
