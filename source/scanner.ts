@@ -15,6 +15,7 @@ export interface FolderInfo {
 export interface ScanOptions {
 	includeFiles?: boolean;
 	depth?: number;
+	concurrency?: number;
 	verbose?: boolean;
 	onProgress?: (scannedFiles: number) => void;
 }
@@ -24,8 +25,18 @@ export interface ScanResult {
 	totalSize: number;
 }
 
+/**
+ * Scans a directory tree and returns the sizes of the discovered entries.
+ *
+ * `concurrency` controls how many directories are read at the same time:
+ * - `0` or omitted: no limit (fastest, matches the behaviour of older versions)
+ * - `1`: one directory at a time (useful for slow or network drives)
+ * - `n`: at most `n` directories at a time
+ */
 export async function scanDirectory(directoryPath: string, options: ScanOptions = {}): Promise<ScanResult> {
 	const maxDepth = options.depth && options.depth > 0 ? options.depth : 1;
+	const concurrency =
+		options.concurrency && options.concurrency > 0 ? options.concurrency : Number.POSITIVE_INFINITY;
 	const folderSizes = new Map<string, number>();
 	const discoveredFolders: Array<{ relPath: string; depth: number }> = [];
 	const discoveredFiles: Array<{ relPath: string; size: number; depth: number }> = [];
@@ -38,20 +49,22 @@ export async function scanDirectory(directoryPath: string, options: ScanOptions 
 		depth: number;
 	}
 
-	const stack: QueueItem[] = [{ fullPath: directoryPath, relPath: "", depth: 0 }];
+	const queue: QueueItem[] = [];
+	let activeCount = 0;
+	let pendingCount = 0;
+	let scanError: unknown;
+	let resolveScan: () => void = () => {};
+	const scanComplete = new Promise<void>((resolve) => {
+		resolveScan = resolve;
+	});
 
-	while (stack.length > 0) {
-		const current = stack.pop();
-		if (!current) {
-			continue;
-		}
-
+	async function scanOne(current: QueueItem): Promise<void> {
 		let dirEntries;
 		try {
 			dirEntries = await fs.readdir(current.fullPath, { withFileTypes: true });
 		} catch (error) {
 			logScanError(current.fullPath, error, options.verbose);
-			continue;
+			return;
 		}
 
 		const statPromises: Promise<{ relPath: string; size: number; depth: number }>[] = [];
@@ -65,7 +78,7 @@ export async function scanDirectory(directoryPath: string, options: ScanOptions 
 				if (entryDepth <= maxDepth) {
 					discoveredFolders.push({ relPath: entryRelPath, depth: entryDepth });
 				}
-				stack.push({
+				schedule({
 					fullPath: entryFullPath,
 					relPath: entryRelPath,
 					depth: entryDepth,
@@ -116,6 +129,45 @@ export async function scanDirectory(directoryPath: string, options: ScanOptions 
 				}
 			}
 		}
+	}
+
+	function drainQueue(): void {
+		while (activeCount < concurrency && queue.length > 0) {
+			const item = queue.pop();
+			if (!item) {
+				return;
+			}
+
+			activeCount++;
+			void scanOne(item)
+				.catch((error: unknown) => {
+					scanError ??= error;
+				})
+				.finally(() => {
+					activeCount--;
+					pendingCount--;
+
+					if (pendingCount === 0) {
+						resolveScan();
+						return;
+					}
+
+					drainQueue();
+				});
+		}
+	}
+
+	function schedule(item: QueueItem): void {
+		pendingCount++;
+		queue.push(item);
+		drainQueue();
+	}
+
+	schedule({ fullPath: directoryPath, relPath: "", depth: 0 });
+	await scanComplete;
+
+	if (scanError) {
+		throw scanError;
 	}
 
 	const totalSize = folderSizes.get("") ?? 0;

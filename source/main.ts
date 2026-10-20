@@ -21,6 +21,7 @@ async function run(): Promise<void> {
 				version: { type: "boolean", short: "v", default: false },
 				limit: { type: "string", short: "n" },
 				depth: { type: "string", short: "d" },
+				concurrency: { type: "string", short: "c" },
 				all: { type: "boolean", short: "a", default: false },
 				"no-emoji": { type: "boolean", default: false },
 				noemoji: { type: "boolean", default: false },
@@ -71,6 +72,19 @@ async function run(): Promise<void> {
 		depth = parsedDepth;
 	}
 
+	let concurrency: number | undefined;
+	if (typeof values.concurrency === "string") {
+		const parsedConcurrency = Number.parseInt(values.concurrency, 10);
+		if (Number.isNaN(parsedConcurrency) || parsedConcurrency < 0) {
+			console.error(
+				`Error: Invalid concurrency value "${values.concurrency}". Must be 0 (unlimited) or a positive integer.`,
+			);
+			process.exitCode = 1;
+			return;
+		}
+		concurrency = parsedConcurrency;
+	}
+
 	const noEmoji = Boolean(values["no-emoji"] || values.noemoji);
 	const verbose = Boolean(values.verbose);
 
@@ -98,6 +112,7 @@ async function run(): Promise<void> {
 		const { entries, totalSize } = await scanDirectory(directoryPath, {
 			includeFiles: Boolean(values.all),
 			depth,
+			concurrency,
 			verbose,
 			onProgress: (scannedFiles) => {
 				spinner.text = `Scanning... (${scannedFiles} files)`;

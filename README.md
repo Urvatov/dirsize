@@ -44,15 +44,16 @@ If no directory is specified, `dirsize` scans the current directory (`.`) by def
 
 ### Options
 
-| Option        | Alias | Description                                                            |
-| ------------- | ----- | ---------------------------------------------------------------------- |
-| `--depth <n>` | `-d`  | Depth of directory traversal (default: 1)                              |
-| `--limit <n>` | `-n`  | Limit output to top N directories (remaining folders grouped together) |
-| `--all`       | `-a`  | Include direct files in the target directory                           |
-| `--no-emoji`  |       | Display plain text types (FOLDER, FILE) instead of emojis              |
-| `--verbose`   |       | Show warnings for inaccessible files and directories                   |
-| `--help`      | `-h`  | Show usage instructions                                                |
-| `--version`   | `-v`  | Show version                                                           |
+| Option              | Alias | Description                                                                |
+| ------------------- | ----- | -------------------------------------------------------------------------- |
+| `--depth <n>`       | `-d`  | Depth of directory traversal (default: 1)                                  |
+| `--limit <n>`       | `-n`  | Limit output to top N directories (remaining folders grouped together)     |
+| `--concurrency <n>` | `-c`  | Max directories read at once (default: `0` = unlimited, `1` = sequential)  |
+| `--all`             | `-a`  | Include direct files in the target directory                               |
+| `--no-emoji`        |       | Display plain text types (FOLDER, FILE) instead of emojis                  |
+| `--verbose`         |       | Show warnings for inaccessible files and directories                       |
+| `--help`            | `-h`  | Show usage instructions                                                    |
+| `--version`         | `-v`  | Show version                                                               |
 
 ## Example
 
@@ -71,6 +72,15 @@ Total: 46.49 MB
 │ 4 │ 📁   │ source       │ 11.01 KB  │ 0.0%  │
 └───┴──────┴──────────────┴───────────┴───────┘
 ```
+
+With a concurrency limit (useful on slow or network drives):
+
+```
+$ dirsize . -c 1
+```
+
+> [!NOTE]
+> Under Node.js, filesystem operations run on a thread pool limited by `UV_THREADPOOL_SIZE` (4 by default), so raising `--concurrency` above 4 has little effect unless you also raise that variable, e.g. `UV_THREADPOOL_SIZE=64 dirsize .`.
 
 With `--limit`:
 

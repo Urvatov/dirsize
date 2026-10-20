@@ -11,6 +11,8 @@ Arguments:
 Options:
   -d, --depth <n>     Depth of directory traversal (default: 1)
   -n, --limit <n>     Limit output to top N directories
+  -c, --concurrency <n>
+                      Max directories read at once (default: 0 = unlimited)
   -a, --all           Include direct files in the target directory
       --no-emoji      Display plain text types (FOLDER, FILE) instead of emojis
       --verbose       Show warnings for inaccessible files and directories
@@ -21,6 +23,7 @@ Examples:
   dirsize
   dirsize ./src
   dirsize . -d 2
+  dirsize . -c 16
   dirsize . -n 10
   dirsize . --all
   dirsize . --no-emoji`);

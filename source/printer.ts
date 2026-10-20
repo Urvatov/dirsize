@@ -58,7 +58,7 @@ export function formatSize(bytes: number): string {
 }
 
 export function printFolders(folders: FolderInfo[], options: PrintFoldersOptions = {}): void {
-	const entries = [...folders].sort((a, b) => b.size - a.size);
+	const entries = [...folders].sort((a, b) => b.size - a.size || a.name.localeCompare(b.name));
 	const total = options.totalSize !== undefined ? options.totalSize : entries.reduce((sum, { size }) => sum + size, 0);
 
 	console.log(`Total: ${formatSize(total)}`);
