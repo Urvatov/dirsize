@@ -25,18 +25,16 @@ export interface ScanResult {
 	totalSize: number;
 }
 
-/**
- * Scans a directory tree and returns the sizes of the discovered entries.
- *
- * `concurrency` controls how many directories are read at the same time:
- * - `0` or omitted: no limit (fastest, matches the behaviour of older versions)
- * - `1`: one directory at a time (useful for slow or network drives)
- * - `n`: at most `n` directories at a time
- */
 export async function scanDirectory(directoryPath: string, options: ScanOptions = {}): Promise<ScanResult> {
-	const maxDepth = options.depth && options.depth > 0 ? options.depth : 1;
-	const concurrency =
-		options.concurrency && options.concurrency > 0 ? options.concurrency : Number.POSITIVE_INFINITY;
+	let maxDepth = options.depth ?? 1;
+	if (maxDepth <= 0) {
+		maxDepth = 1;
+	}
+
+	let concurrency = options.concurrency ?? 0;
+	if (concurrency <= 0) {
+		concurrency = Number.POSITIVE_INFINITY;
+	}
 	const folderSizes = new Map<string, number>();
 	const discoveredFolders: Array<{ relPath: string; depth: number }> = [];
 	const discoveredFiles: Array<{ relPath: string; size: number; depth: number }> = [];
@@ -70,7 +68,11 @@ export async function scanDirectory(directoryPath: string, options: ScanOptions 
 		const statPromises: Promise<{ relPath: string; size: number; depth: number }>[] = [];
 
 		for (const entry of dirEntries) {
-			const entryRelPath = current.relPath ? `${current.relPath}/${entry.name}` : entry.name;
+			let entryRelPath = entry.name;
+			if (current.relPath) {
+				entryRelPath = `${current.relPath}/${entry.name}`;
+			}
+
 			const entryFullPath = path.join(current.fullPath, entry.name);
 			const entryDepth = current.depth + 1;
 
@@ -117,7 +119,7 @@ export async function scanDirectory(directoryPath: string, options: ScanOptions 
 				}
 
 				const lastSlash = file.relPath.lastIndexOf("/");
-				let folderPath = lastSlash === -1 ? "" : file.relPath.slice(0, lastSlash);
+				let folderPath = file.relPath.slice(0, Math.max(lastSlash, 0));
 
 				while (true) {
 					folderSizes.set(folderPath, (folderSizes.get(folderPath) ?? 0) + file.size);
@@ -125,7 +127,7 @@ export async function scanDirectory(directoryPath: string, options: ScanOptions 
 						break;
 					}
 					const prevSlash = folderPath.lastIndexOf("/");
-					folderPath = prevSlash === -1 ? "" : folderPath.slice(0, prevSlash);
+					folderPath = folderPath.slice(0, Math.max(prevSlash, 0));
 				}
 			}
 		}

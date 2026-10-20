@@ -30,6 +30,7 @@ export const UNIT_ORDER: readonly SizeUnit[] = [
 export interface PrintFoldersOptions {
 	limit?: number;
 	totalSize?: number;
+	elapsedMs?: number;
 	noEmoji?: boolean;
 }
 
@@ -52,23 +53,42 @@ export function formatSize(bytes: number): string {
 	}
 
 	const unit = UNIT_ORDER[unitIndex];
-	const formattedSize = size % 1 === 0 ? String(size) : size.toFixed(2);
+	let formattedSize = size.toFixed(2);
+	if (size % 1 === 0) {
+		formattedSize = String(size);
+	}
 
 	return `${formattedSize} ${unit}`;
 }
 
+function formatPercent(size: number, total: number): string {
+	if (total <= 0) {
+		return "0.0%";
+	}
+
+	return `${((size / total) * 100).toFixed(1)}%`;
+}
+
 export function printFolders(folders: FolderInfo[], options: PrintFoldersOptions = {}): void {
 	const entries = [...folders].sort((a, b) => b.size - a.size || a.name.localeCompare(b.name));
-	const total = options.totalSize !== undefined ? options.totalSize : entries.reduce((sum, { size }) => sum + size, 0);
+	const total = options.totalSize ?? entries.reduce((sum, { size }) => sum + size, 0);
 
 	console.log(`Total: ${formatSize(total)}`);
+
+	if (options.elapsedMs !== undefined) {
+		console.log(`Time: ${(options.elapsedMs / 1000).toFixed(2)}s`);
+	}
 
 	if (entries.length === 0) {
 		console.log("No items found.");
 		return;
 	}
 
-	const limit = options.limit && options.limit > 0 ? options.limit : entries.length;
+	let limit = entries.length;
+	if (options.limit && options.limit > 0) {
+		limit = options.limit;
+	}
+
 	const visible = entries.slice(0, limit);
 	const remaining = entries.slice(limit);
 
@@ -78,7 +98,7 @@ export function printFolders(folders: FolderInfo[], options: PrintFoldersOptions
 	});
 
 	visible.forEach(({ name, size, entryType }, index) => {
-		const percent = total > 0 ? ((size / total) * 100).toFixed(1) + "%" : "0.0%";
+		const percent = formatPercent(size, total);
 		let typeLabel: string;
 
 		if (options.noEmoji) {
@@ -112,8 +132,12 @@ export function printFolders(folders: FolderInfo[], options: PrintFoldersOptions
 
 	if (remaining.length > 0) {
 		const remainingSize = remaining.reduce((sum, { size }) => sum + size, 0);
-		const remainingPercent = total > 0 ? ((remainingSize / total) * 100).toFixed(1) + "%" : "0.0%";
-		const remainingType = options.noEmoji ? UNKNOWN_TEXT : UNKNOWN_EMOJI;
+		const remainingPercent = formatPercent(remainingSize, total);
+		let remainingType = UNKNOWN_EMOJI;
+		if (options.noEmoji) {
+			remainingType = UNKNOWN_TEXT;
+		}
+
 		table.push(["-", remainingType, `(${remaining.length} other entries)`, formatSize(remainingSize), remainingPercent]);
 	}
 

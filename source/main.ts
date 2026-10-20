@@ -12,6 +12,7 @@ import { printHelp } from "./help";
 const VERSION = pkg.version;
 
 async function run(): Promise<void> {
+	const startTime = performance.now();
 	let args;
 	try {
 		args = parseArgs({
@@ -31,8 +32,7 @@ async function run(): Promise<void> {
 			strict: false,
 		});
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		console.error(`Error: ${message}`);
+		console.error(`Error: ${getErrorMessage(error)}`);
 		console.error("Run 'dirsize --help' for usage instructions.");
 		process.exitCode = 1;
 		return;
@@ -99,8 +99,7 @@ async function run(): Promise<void> {
 			return;
 		}
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		console.error(`Error: Cannot access "${directoryPath}": ${message}`);
+		console.error(`Error: Cannot access "${directoryPath}": ${getErrorMessage(error)}`);
 		process.exitCode = 1;
 		return;
 	}
@@ -119,13 +118,25 @@ async function run(): Promise<void> {
 			},
 		});
 		spinner.stop();
-		printFolders(entries, { limit, totalSize, noEmoji });
+		printFolders(entries, {
+			limit,
+			totalSize,
+			elapsedMs: performance.now() - startTime,
+			noEmoji,
+		});
 	} catch (error) {
 		spinner.stop();
-		const message = error instanceof Error ? error.message : String(error);
-		console.error(`Failed to scan "${directoryPath}": ${message}`);
+		console.error(`Failed to scan "${directoryPath}": ${getErrorMessage(error)}`);
 		process.exitCode = 1;
 	}
+}
+
+function getErrorMessage(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return String(error);
 }
 
 run();

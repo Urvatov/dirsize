@@ -60,6 +60,7 @@ If no directory is specified, `dirsize` scans the current directory (`.`) by def
 ```
 $ dirsize .
 Total: 46.49 MB
+Time: 0.18s
 ┌───┬──────┬──────────────┬───────────┬───────┐
 │ # │ Type │ Entry        │ Size      │ %     │
 ├───┼──────┼──────────────┼───────────┼───────┤
@@ -87,6 +88,7 @@ With `--limit`:
 ```
 $ dirsize . -n 2
 Total: 46.49 MB
+Time: 0.18s
 ┌───┬──────┬───────────────────┬───────────┬───────┐
 │ # │ Type │ Entry             │ Size      │ %     │
 ├───┼──────┼───────────────────┼───────────┼───────┤
